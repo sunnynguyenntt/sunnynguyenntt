@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskM</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div id="app" class="container mx-auto p-4">
+        <h1 class="text-3xl font-bold mb-4">TaskM</h1>
+        
+        <!-- Thêm task mới -->
+        <div class="mb-4">
+            <input v-model="newTask.name" class="border p-2 mr-2" placeholder="Tên task">
+            <input v-model="newTask.dueDate" type="date" class="border p-2 mr-2" placeholder="Ngày phải hoàn thành">
+            <button @click="addTask" class="bg-blue-500 text-white px-4 py-2 rounded">Thêm Task</button>
+        </div>
+
+        <!-- Tìm kiếm và các nút chức năng -->
+        <div class="mt-4 mb-4">
+            <input v-model="searchQuery" class="border p-2 mr-2" placeholder="Tìm kiếm task hoặc nhân sự">
+            <button @click="search" class="bg-blue-500 text-white px-4 py-2 rounded mr-2">Tìm kiếm</button>
+            <button @click="showAllTasks" class="bg-green-500 text-white px-4 py-2 rounded">Hiển thị tất cả task</button>
+        </div>
+
+        <!-- Danh sách task hoặc kết quả tìm kiếm -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div v-for="task in displayedTasks" :key="task.id" class="bg-white p-4 rounded shadow">
+                <h3 class="text-xl font-semibold mb-2" :class="{'line-through': task.completed}">
+                    {{ task.name }}
+                </h3>
+                <p>Trạng thái: {{ task.completed ? 'Hoàn thành' : 'Chưa hoàn thành' }}</p>
+                <p>Ngày phải hoàn thành: {{ task.dueDate }}</p>
+                <p>Ngày hoàn thành thực tế: {{ task.completedDate || 'Chưa hoàn thành' }}</p>
+                <div class="mt-2">
+                    <button @click="toggleTaskCompletion(task)" class="bg-green-500 text-white px-2 py-1 rounded mr-2">
+                        {{ task.completed ? 'Hủy hoàn thành' : 'Đánh dấu hoàn thành' }}
+                    </button>
+                    <button @click="deleteTask(task)" class="bg-red-500 text-white px-2 py-1 rounded">Xóa</button>
+                </div>
+                <div class="mt-2">
+                    <input v-model="task.description" class="border p-2 w-full" placeholder="Mô tả chi tiết">
+                </div>
+                <div class="mt-2">
+                    <h4 class="font-semibold">Nhân sự:</h4>
+                    <ul>
+                        <li v-for="person in task.personnel" :key="person">
+                            {{ person }}
+                            <button @click="removePersonnel(task, person)" class="text-red-500 ml-2">Xóa</button>
+                        </li>
+                    </ul>
+                    <input v-model="newPersonnel" class="border p-2 mr-2" placeholder="Thêm nhân sự">
+                    <button @click="addPersonnel(task)" class="bg-blue-500 text-white px-2 py-1 rounded">Thêm</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Thống kê -->
+        <div class="mt-8">
+            <h2 class="text-2xl font-bold mb-2">Thống kê</h2>
+            <p>Tổng số task: {{ tasks.length }}</p>
+            <p>Số task hoàn thành: {{ completedTasks.length }}</p>
+            <p>Số task trễ hạn: {{ overdueTasks.length }}</p>
+            <p>Tỷ lệ hoàn thành: {{ completionRate }}%</p>
+        </div>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                tasks: [],
+                newTask: { name: '', dueDate: '', description: '', personnel: [] },
+                newPersonnel: '',
+                searchQuery: '',
+                displayedTasks: []
+            },
+            computed: {
+                completedTasks() {
+                    return this.tasks.filter(task => task.completed);
+                },
+                overdueTasks() {
+                    const today = new Date();
+                    return this.tasks.filter(task => new Date(task.dueDate) < today && !task.completed);
+                },
+                completionRate() {
+                    return this.tasks.length > 0 ? (this.completedTasks.length / this.tasks.length * 100).toFixed(2) : 0;
+                }
+            },
+            methods: {
+                addTask() {
+                    if (this.newTask.name && this.newTask.dueDate) {
+                        this.tasks.push({
+                            id: Date.now(),
+                            ...this.newTask,
+                            completed: false,
+                            completedDate: null,
+                            personnel: []
+                        });
+                        this.newTask = { name: '', dueDate: '', description: '', personnel: [] };
+                        this.showAllTasks();
+                    }
+                },
+                toggleTaskCompletion(task) {
+                    task.completed = !task.completed;
+                    task.completedDate = task.completed ? new Date().toISOString().split('T')[0] : null;
+                },
+                deleteTask(task) {
+                    const index = this.tasks.indexOf(task);
+                    if (index > -1) {
+                        this.tasks.splice(index, 1);
+                    }
+                    this.showAllTasks();
+                },
+                addPersonnel(task) {
+                    if (this.newPersonnel && !task.personnel.includes(this.newPersonnel)) {
+                        task.personnel.push(this.newPersonnel);
+                        this.newPersonnel = '';
+                    }
+                },
+                removePersonnel(task, person) {
+                    const index = task.personnel.indexOf(person);
+                    if (index > -1) {
+                        task.personnel.splice(index, 1);
+                    }
+                },
+                search() {
+                    const query = this.searchQuery.toLowerCase();
+                    this.displayedTasks = this.tasks.filter(task => 
+                        task.name.toLowerCase() === query ||
+                        task.personnel.some(person => person.toLowerCase() === query)
+                    );
+                },
+                showAllTasks() {
+                    this.displayedTasks = this.tasks;
+                    this.searchQuery = '';
+                }
+            },
+            created() {
+                this.showAllTasks();
+            }
+        });
+    </script>
+</body>
+</html>
